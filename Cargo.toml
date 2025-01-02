@@ -138,7 +138,8 @@ std = [
     "zeroize?/std",
 ]
 ssz = ["std", "dep:ethereum_ssz"]
-alloc = [
+alloc = []
+alloc_opt = [
     "proptest?/alloc",
     "rand?/alloc",
     "serde?/alloc",
