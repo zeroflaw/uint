@@ -9,11 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2025-03-25
+
+### Added
+
+- Add const `not` function ([#442])
+- Make `leading_zeros`, `leading_ones`, `count_ones`, `count_zeros`, `bit_len`, `byte_len`, `is_power_of_two` functions `const` ([#442])
+- `random`, `random_with`, `randomize`, `randomize_with` methods ([#444])
+- rand 0.9 support ([#445])
+- Add `const ONE` ([#448])
+
+### Changed
+
+- Update `try_from_{b,l}e_slice` documentation ([#439])
+
+### Fixed
+
+- Fix `checked_byte` bounds check and make it const ([#438])
+
+[#438]: https://github.com/recmo/uint/pull/438
+[#439]: https://github.com/recmo/uint/pull/439
+[#442]: https://github.com/recmo/uint/pull/442
+[#444]: https://github.com/recmo/uint/pull/444
+[#445]: https://github.com/recmo/uint/pull/445
+[#448]: https://github.com/recmo/uint/pull/448
+
+## [1.13.1] - 2025-02-18
+
+### Fixed
+
+- Remove unused `hex` dependencies which broke `no_std` ([#433])
+
+[#433]: https://github.com/recmo/uint/pull/433
+
+## [1.13.0] - 2025-02-18
+
+### Added
+
 - Support for borsh @ 1.5 ([#416])
 - `copy_le_to_slice` family to allow easier writing to pre-allocated buffers ([#424])
+- add `Uint::checked_byte(idx: usize) -> Option<u8>` ([#429])
+
+### Changed
+
+- Unpin proptest ([#426])
+
+### Fixed
+
+- Update documentation related to `Uint::byte` and knuth divison ([#429])
+- fix: swap bytes for `as_le_bytes` in big endian world ([#431])
 
 [#416]: https://github.com/recmo/uint/pull/416
 [#424]: https://github.com/recmo/uint/pull/424
+[#426]: https://github.com/recmo/uint/pull/426
+[#429]: https://github.com/recmo/uint/pull/429
+[#431]: https://github.com/recmo/uint/pull/431
 
 ## [1.12.4] - 2024-12-16
 
@@ -362,7 +412,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- links to version -->
 
-[unreleased]: https://github.com/recmo/uint/compare/v1.12.4...HEAD
+[unreleased]: https://github.com/recmo/uint/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/recmo/uint/releases/tag/v1.14.0
+[1.13.1]: https://github.com/recmo/uint/releases/tag/v1.13.1
+[1.13.0]: https://github.com/recmo/uint/releases/tag/v1.13.0
 [1.12.4]: https://github.com/recmo/uint/releases/tag/v1.12.4
 [1.12.3]: https://github.com/recmo/uint/releases/tag/v1.12.3
 [1.12.1]: https://github.com/recmo/uint/releases/tag/v1.12.1

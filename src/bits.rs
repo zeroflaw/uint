@@ -37,7 +37,8 @@ impl<const BITS: usize, const LIMBS: usize> Uint<BITS, LIMBS> {
     ///
     /// # Panics
     ///
-    /// Panics if `index` exceeds the byte width of the number.
+    /// Panics if `index` is greater than or equal to the byte width of the
+    /// number.
     ///
     /// # Examples
     ///
@@ -80,6 +81,29 @@ impl<const BITS: usize, const LIMBS: usize> Uint<BITS, LIMBS> {
         }
     }
 
+    /// Returns a specific byte, or `None` if `index` is out of range. The byte
+    /// at index `0` is the least significant byte (little endian).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ruint::uint;
+    /// let x = uint!(0x1234567890_U64);
+    /// assert_eq!(x.checked_byte(0), Some(0x90));
+    /// assert_eq!(x.checked_byte(7), Some(0x00));
+    /// // Out of range
+    /// assert_eq!(x.checked_byte(8), None);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn checked_byte(&self, index: usize) -> Option<u8> {
+        if index < Self::BYTES {
+            Some(self.byte(index))
+        } else {
+            None
+        }
+    }
+
     /// Reverses the order of bits in the integer. The least significant bit
     /// becomes the most significant bit, second least-significant bit becomes
     /// second most-significant bit, etc.
@@ -96,29 +120,49 @@ impl<const BITS: usize, const LIMBS: usize> Uint<BITS, LIMBS> {
         self
     }
 
+    /// Inverts all the bits in the integer.
+    #[inline]
+    #[must_use]
+    pub const fn not(mut self) -> Self {
+        if BITS == 0 {
+            return Self::ZERO;
+        }
+
+        let mut i = 0;
+        while i < LIMBS {
+            self.limbs[i] = !self.limbs[i];
+            i += 1;
+        }
+
+        self.masked()
+    }
+
     /// Returns the number of leading zeros in the binary representation of
     /// `self`.
     #[inline]
     #[must_use]
-    pub fn leading_zeros(&self) -> usize {
-        self.as_limbs()
-            .iter()
-            .rev()
-            .position(|&limb| limb != 0)
-            .map_or(BITS, |n| {
-                let fixed = Self::MASK.leading_zeros() as usize;
+    pub const fn leading_zeros(&self) -> usize {
+        let mut i = LIMBS;
+        while i > 0 {
+            i -= 1;
+            if self.limbs[i] != 0 {
+                let n = LIMBS - 1 - i;
                 let skipped = n * 64;
-                let top = self.as_limbs()[LIMBS - n - 1].leading_zeros() as usize;
-                skipped + top - fixed
-            })
+                let fixed = Self::MASK.leading_zeros() as usize;
+                let top = self.limbs[i].leading_zeros() as usize;
+                return skipped + top - fixed;
+            }
+        }
+
+        BITS
     }
 
     /// Returns the number of leading ones in the binary representation of
     /// `self`.
     #[inline]
     #[must_use]
-    pub fn leading_ones(&self) -> usize {
-        (self.not()).leading_zeros()
+    pub const fn leading_ones(&self) -> usize {
+        Self::not(*self).leading_zeros()
     }
 
     /// Returns the number of trailing zeros in the binary representation of
@@ -150,31 +194,42 @@ impl<const BITS: usize, const LIMBS: usize> Uint<BITS, LIMBS> {
     /// Returns the number of ones in the binary representation of `self`.
     #[inline]
     #[must_use]
-    pub fn count_ones(&self) -> usize {
-        self.as_limbs()
-            .iter()
-            .map(|limb| limb.count_ones() as usize)
-            .sum()
+    pub const fn count_ones(&self) -> usize {
+        let mut total = 0;
+
+        let mut i = 0;
+        while i < LIMBS {
+            total += self.limbs[i].count_ones() as usize;
+            i += 1;
+        }
+
+        total
     }
 
     /// Returns the number of zeros in the binary representation of `self`.
     #[must_use]
     #[inline]
-    pub fn count_zeros(&self) -> usize {
+    pub const fn count_zeros(&self) -> usize {
         BITS - self.count_ones()
     }
 
-    /// Length of the number in bits ignoring leading zeros.
+    /// Returns the dynamic length of this number in bits, ignoring leading
+    /// zeros.
+    ///
+    /// For the maximum length of the type, use [`Uint::BITS`](Self::BITS).
     #[must_use]
     #[inline]
-    pub fn bit_len(&self) -> usize {
+    pub const fn bit_len(&self) -> usize {
         BITS - self.leading_zeros()
     }
 
-    /// Length of the number in bytes ignoring leading zeros.
+    /// Returns the dynamic length of this number in bytes, ignoring leading
+    /// zeros.
+    ///
+    /// For the maximum length of the type, use [`Uint::BYTES`](Self::BYTES).
     #[must_use]
     #[inline]
-    pub fn byte_len(&self) -> usize {
+    pub const fn byte_len(&self) -> usize {
         (self.bit_len() + 7) / 8
     }
 
@@ -268,7 +323,7 @@ impl<const BITS: usize, const LIMBS: usize> Uint<BITS, LIMBS> {
             r.limbs[i + limbs] = (x << bits) | carry;
             carry = (x >> (word_bits - bits - 1)) >> 1;
         }
-        r.limbs[LIMBS - 1] &= Self::MASK;
+        r.apply_mask();
         (r, carry != 0)
     }
 
@@ -395,15 +450,8 @@ impl<const BITS: usize, const LIMBS: usize> Not for Uint<BITS, LIMBS> {
     type Output = Self;
 
     #[inline]
-    fn not(mut self) -> Self::Output {
-        if BITS == 0 {
-            return Self::ZERO;
-        }
-        for limb in &mut self.limbs {
-            *limb = u64::not(*limb);
-        }
-        self.limbs[LIMBS - 1] &= Self::MASK;
-        self
+    fn not(self) -> Self::Output {
+        Self::not(self)
     }
 }
 
@@ -660,13 +708,13 @@ mod tests {
     fn test_leading_zeros() {
         assert_eq!(Uint::<0, 0>::ZERO.leading_zeros(), 0);
         assert_eq!(Uint::<1, 1>::ZERO.leading_zeros(), 1);
-        assert_eq!(Uint::<1, 1>::from(1).leading_zeros(), 0);
+        assert_eq!(Uint::<1, 1>::ONE.leading_zeros(), 0);
         const_for!(BITS in NON_ZERO {
             const LIMBS: usize = nlimbs(BITS);
             type U = Uint::<BITS, LIMBS>;
             assert_eq!(U::ZERO.leading_zeros(), BITS);
             assert_eq!(U::MAX.leading_zeros(), 0);
-            assert_eq!(U::from(1).leading_zeros(), BITS - 1);
+            assert_eq!(U::ONE.leading_zeros(), BITS - 1);
             proptest!(|(value: U)| {
                 let zeros = value.leading_zeros();
                 assert!(zeros <= BITS);
@@ -690,7 +738,7 @@ mod tests {
     fn test_leading_ones() {
         assert_eq!(Uint::<0, 0>::ZERO.leading_ones(), 0);
         assert_eq!(Uint::<1, 1>::ZERO.leading_ones(), 0);
-        assert_eq!(Uint::<1, 1>::from(1).leading_ones(), 1);
+        assert_eq!(Uint::<1, 1>::ONE.leading_ones(), 1);
     }
 
     #[test]
@@ -796,7 +844,6 @@ mod tests {
             type U = Uint::<BITS, LIMBS>;
             proptest!(|(value: U, shift in  0..=BITS + 2)| {
                 let shifted = value.arithmetic_shr(shift);
-                // dbg!(value, shifted, shift);
                 assert_eq!(shifted.leading_ones(), match value.leading_ones() {
                     0 => 0,
                     n => min(BITS, n + shift)
